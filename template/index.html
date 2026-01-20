@@ -300,6 +300,16 @@
             </div>
         </div>
 
+        <!-- Simulated Output Section -->
+        <div class="alt-chart-container full-width" style="margin-top: 20px;">
+            <div class="chart-title">SIMULATED OUTPUT</div>
+            <div id="simulatedOutputContainer"
+                style="display: flex; flex-direction: column; gap: 30px; align-items: center; margin-top: 15px;">
+                <!-- Images will be loaded here -->
+                <div id="simLoading" style="color: #888; padding: 20px;">Scanning for simulated outputs...</div>
+            </div>
+        </div>
+
         <!-- Additional Charts -->
         <div class="alt-chart-container full-width">
             <div class="chart-title">TRAJECTORY</div>
@@ -397,6 +407,52 @@
                 green: '#51cf66',
                 purple: '#b19cd9'
             };
+
+            async function loadSimulatedOutputs() {
+                const container = document.getElementById('simulatedOutputContainer');
+                if (!container) return;
+                try {
+                    const response = await fetch('/api/simulated');
+                    const data = await response.json();
+
+                    if (data.images && data.images.length > 0) {
+                        container.innerHTML = '';
+                        data.images.forEach(filename => {
+                            const imgWrapper = document.createElement('div');
+                            imgWrapper.style.textAlign = 'center';
+                            imgWrapper.style.background = 'rgba(0,0,0,0.2)';
+                            imgWrapper.style.padding = '10px';
+                            imgWrapper.style.borderRadius = '5px';
+                            imgWrapper.style.border = '1px solid rgba(0, 212, 255, 0.3)';
+
+                            const img = document.createElement('img');
+                            img.src = `/api/simulated/${filename}`;
+                            img.alt = filename;
+                            img.style.width = '100%';
+                            img.style.maxWidth = '1000px';
+                            img.style.height = 'auto';
+                            img.style.borderRadius = '5px';
+                            img.style.display = 'block';
+                            img.style.marginBottom = '10px';
+                            img.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+
+                            const label = document.createElement('div');
+                            label.textContent = filename;
+                            label.style.fontSize = '0.8em';
+                            label.style.color = '#00d4ff';
+
+                            imgWrapper.appendChild(img);
+                            imgWrapper.appendChild(label);
+                            container.appendChild(imgWrapper);
+                        });
+                    } else {
+                        container.innerHTML = '<div style="color: #888; padding: 20px;">No simulated outputs found.</div>';
+                    }
+                } catch (error) {
+                    console.error('Error loading simulated outputs:', error);
+                    container.innerHTML = '<div style="color: #ff6b6b; padding: 20px;">Error scanning for outputs.</div>';
+                }
+            }
 
             // ================= 3D ROCKET SETUP =================
             function init3DRocket() {
@@ -897,6 +953,13 @@
                     console.log('Telemetry polling started');
                 } catch (e) {
                     console.error('❌ Failed to start telemetry polling:', e);
+                }
+
+                try {
+                    loadSimulatedOutputs();
+                    console.log('✅ Simulated outputs loaded');
+                } catch (e) {
+                    console.error('❌ Failed to load simulated outputs:', e);
                 }
 
                 const btnTestData = document.getElementById('btnTestData');

@@ -282,6 +282,27 @@ def get_model_stl():
     else:
         return jsonify({"error": "STL model not found"}), 404
 
+@app.route("/api/simulated/<filename>", methods=["GET"])
+def get_simulated_image(filename):
+    """Serve simulated output images"""
+    sim_path = os.path.join(os.path.dirname(__file__), "simulated output", filename)
+    
+    if os.path.exists(sim_path):
+        return send_file(sim_path, mimetype='image/png')
+    else:
+        return jsonify({"error": "Image not found"}), 404
+
+@app.route("/api/simulated", methods=["GET"])
+def list_simulated_images():
+    """List all simulated output images"""
+    sim_dir = os.path.join(os.path.dirname(__file__), "simulated output")
+    
+    if os.path.exists(sim_dir):
+        images = [f for f in os.listdir(sim_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.gif'))]
+        return jsonify({"images": images})
+    else:
+        return jsonify({"images": []})
+
 # ================= MAIN =================
 if __name__ == "__main__":
     print("\nStarting Flight Telemetry Server...")
