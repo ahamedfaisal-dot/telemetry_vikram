@@ -15,16 +15,38 @@ A real-time rocket telemetry visualization system that displays flight data from
 
 ## Hardware Requirements
 
-### Ground Station Receiver
+### Ground Station Receiver (RX)
 
-- **Microcontroller**: Arduino/ESP32 with LoRa module (SX1276/SX1278)
-- **Connection**: USB to Serial (appears as COM port on Windows)
-- **Baud Rate**: 115200
+| Component | Pin (ESP32) | Connection |
+| --------- | ----------- | ---------- |
+| LoRa SCK  | 18          | LoRa SCK   |
+| LoRa MISO | 19          | LoRa MISO  |
+| LoRa MOSI | 23          | LoRa MOSI  |
+| LoRa CS   | 5           | LoRa NSS   |
+| LoRa RST  | 14          | LoRa RST   |
+| LoRa IRQ  | 26          | LoRa DIO0  |
+| USB       | Micro-USB   | PC (COM3)  |
 
-### Rocket Transmitter
+### Rocket Transmitter (TX)
 
-- **Sensors**: MPU6050 (accelerometer + gyroscope), BMP280 (altitude)
-- **Communication**: LoRa radio module matching ground station frequency
+| Component        | Pin (ESP32) | Connection |
+| ---------------- | ----------- | ---------- |
+| LoRa SCK         | 18          | LoRa SCK   |
+| LoRa MISO        | 19          | LoRa MISO  |
+| LoRa MOSI        | 23          | LoRa MOSI  |
+| LoRa CS          | 5           | LoRa NSS   |
+| LoRa RST         | 14          | LoRa RST   |
+| LoRa IRQ         | 26          | LoRa DIO0  |
+| MPU6050/BMP180 SDA| 21          | I2C SDA    |
+| MPU6050/BMP180 SCL| 22          | I2C SCL    |
+| Ejection Servo   | 25          | Servo PWM  |
+
+### Radio Configuration
+- **Frequency**: 433 MHz
+- **Spreading Factor**: 7
+- **Signal Bandwidth**: 125 kHz
+- **Coding Rate**: 4/5
+- **CRC**: Enabled
 
 ### Expected JSON Data Format
 
