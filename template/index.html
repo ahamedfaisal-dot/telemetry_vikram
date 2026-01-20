@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Parameters Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a3a52 0%, #0f2438 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            border-bottom: 3px solid #00d4ff;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #00d4ff;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff6b6b;
+        }
+
+        .status-indicator.connected {
+            background: #51cf66;
+            box-shadow: 0 0 10px #51cf66;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 300px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            background: rgba(20, 40, 80, 0.8);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+            position: relative;
+        }
+
+        .chart-title {
+            color: #ff6b6b;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            font-size: 0.95em;
+            letter-spacing: 1px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        .parameters-panel {
+            background: rgba(20, 40, 80, 0.8);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+
+        .param-title {
+            color: #00d4ff;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .param-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .param-label {
+            font-size: 0.85em;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .param-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #00d4ff;
+            text-align: right;
+        }
+
+        .param-unit {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .alt-chart-container {
+            background: rgba(20, 40, 80, 0.8);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 350px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .parameters-panel {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+
+        .no-data {
+            text-align: center;
+            color: #aaa;
+            padding: 40px 20px;
+            font-style: italic;
+        }
+
+        #rocketContainer {
+            background: transparent;
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        .rocket-label {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            color: #00d4ff;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+
+        .orientation-info {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            color: #aaa;
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>FLIGHT PARAMETERS</h1>
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-indicator" id="statusIndicator"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <div class="status-item">Packets: <span id="packetCount">0</span></div>
+                <div class="status-item">Data Points: <span id="dataPointCount">0</span></div>
+                <div class="status-item">
+                    <button id="btnTestData"
+                        style="background: rgba(0, 212, 255, 0.2); border: 1px solid #00d4ff; color: #00d4ff; cursor: pointer; padding: 2px 10px; border-radius: 4px; font-size: 0.8em;">Inject
+                        Test Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Time vs Relative Velocity Chart -->
+            <div class="chart-container">
+                <div class="chart-title">TIME vs RELATIVE VELOCITY</div>
+                <div class="chart-wrapper">
+                    <canvas id="velocityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Time vs Altitude Chart -->
+            <div class="chart-container">
+                <div class="chart-title">TIME vs ALTITUDE</div>
+                <div class="chart-wrapper">
+                    <canvas id="altitudeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Parameters Panel -->
+            <div class="parameters-panel">
+                <div class="param-title">TELEMETRY</div>
+                <div class="param-item">
+                    <div class="param-label">TIME</div>
+                    <div class="param-value" id="paramTime">--</div>
+                    <div class="param-unit">ms</div>
+                </div>
+                <div class="param-item">
+                    <div class="param-label">ALT</div>
+                    <div class="param-value" id="paramAltitude">--</div>
+                    <div class="param-unit">m</div>
+                </div>
+                <div class="param-item">
+                    <div class="param-label">ACCEL</div>
+                    <div class="param-value" id="paramAccel">--</div>
+                    <div class="param-unit">g</div>
+                </div>
+                <div class="param-item">
+                    <div class="param-label">GYRO</div>
+                    <div class="param-value" id="paramGyro">--</div>
+                    <div class="param-unit">°/s</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Charts -->
+        <div class="alt-chart-container full-width">
+            <div class="chart-title">TRAJECTORY</div>
+            <div class="chart-wrapper">
+                <canvas id="trajectoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 3D Rocket Model -->
+        <div class="alt-chart-container full-width" style="margin-top: 20px;">
+            <div class="rocket-label">3D ROCKET ORIENTATION</div>
+            <div id="rocketContainer">
+                <canvas id="canvas3d"></canvas>
+                <div class="orientation-info">
+                    <div>Roll (X): <span id="rollAngle">0.0°</span></div>
+                    <div>Pitch (Y): <span id="pitchAngle">0.0°</span></div>
+                    <div>Yaw (Z): <span id="yawAngle">0.0°</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Readings -->
+        <div class="alt-chart-container full-width" style="margin-top: 20px;">
+            <div class="chart-title">DETAILED READINGS</div>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #00d4ff;">
+                        <th style="text-align: left; padding: 10px; color: #00d4ff;">Parameter</th>
+                        <th style="text-align: left; padding: 10px; color: #00d4ff;">X</th>
+                        <th style="text-align: left; padding: 10px; color: #00d4ff;">Y</th>
+                        <th style="text-align: left; padding: 10px; color: #00d4ff;">Z</th>
+                        <th style="text-align: left; padding: 10px; color: #00d4ff;">Magnitude</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid rgba(0, 212, 255, 0.2);">
+                        <td style="padding: 10px;">Acceleration (g)</td>
+                        <td style="padding: 10px;" id="ax">--</td>
+                        <td style="padding: 10px;" id="ay">--</td>
+                        <td style="padding: 10px;" id="az">--</td>
+                        <td style="padding: 10px; color: #ffd700; font-weight: bold;" id="accelMag">--</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(0, 212, 255, 0.2);">
+                        <td style="padding: 10px;">Gyroscope (°/s)</td>
+                        <td style="padding: 10px;" id="gx">--</td>
+                        <td style="padding: 10px;" id="gy">--</td>
+                        <td style="padding: 10px;" id="gz">--</td>
+                        <td style="padding: 10px; color: #ff6b6b; font-weight: bold;" id="gyroMag">--</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div
+                style="margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                <div
+                    style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 5px; border-left: 3px solid #51cf66;">
+                    <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Altitude</div>
+                    <div style="font-size: 1.2em; color: #51cf66; font-weight: bold;" id="displayAlt">--</div>
+                </div>
+                <div
+                    style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 5px; border-left: 3px solid #b19cd9;">
+                    <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Timestamp</div>
+                    <div style="font-size: 1.2em; color: #b19cd9; font-weight: bold;" id="displayTs">--</div>
+                </div>
+                <div
+                    style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 5px; border-left: 3px solid #51cf66;">
+                    <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Launched</div>
+                    <div style="font-size: 1.2em; color: #51cf66; font-weight: bold;" id="displayLaunched">--</div>
+                </div>
+                <div
+                    style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 5px; border-left: 3px solid #ff6b6b;">
+                    <div style="font-size: 0.75em; color: #888; text-transform: uppercase;">Ejected</div>
+                    <div style="font-size: 1.2em; color: #ff6b6b; font-weight: bold;" id="displayEjected">--</div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Global variables
+            let velocityChart, altitudeChart, trajectoryChart;
+            let timeData = [];
+            let velocityData = [];
+            let altitudeData = [];
+            let rangeData = [];
+            let azimuthData = [];
+
+            // 3D Scene variables
+            let scene, camera, renderer, rocket;
+            let accelX = 0, accelY = 0, accelZ = 1;
+
+            // Color scheme
+            const colors = {
+                yellow: '#ffd700',
+                red: '#ff6b6b',
+                cyan: '#00d4ff',
+                green: '#51cf66',
+                purple: '#b19cd9'
+            };
+
+            // ================= 3D ROCKET SETUP =================
+            function init3DRocket() {
+                // Scene setup
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x142850);
+
+                // Camera
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / 400, 0.1, 1000);
+                camera.position.set(0, 0, 8);
+
+                // Renderer
+                const canvas = document.getElementById('canvas3d');
+                renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+                renderer.setSize(window.innerWidth, 400);
+                renderer.setPixelRatio(window.devicePixelRatio);
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+                scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                directionalLight.position.set(10, 10, 5);
+                directionalLight.castShadow = true;
+                scene.add(directionalLight);
+
+                const pointLight = new THREE.PointLight(0x00d4ff, 0.6);
+                pointLight.position.set(-10, 10, 10);
+                scene.add(pointLight);
+
+                // Load 3D model
+                loadRocketModel();
+
+                // Add a Procedural fallback immediately, we'll replace it if model loads
+                loadProceduralFallback();
+
+                // Animation loop
+                animate3D();
+
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    const container = document.getElementById('rocketContainer');
+                    if (container) {
+                        const width = container.clientWidth;
+                        const height = container.clientHeight;
+                        camera.aspect = width / height;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(width, height);
+                    }
+                });
+            }
+
+            function loadRocketModel() {
+                console.log('📦 Attempting to load STL model...');
+
+                // Robust check for STLLoader existence (THREE.STLLoader or global STLLoader)
+                const STLLoaderConstructor = (typeof THREE.STLLoader === 'function') ? THREE.STLLoader : (typeof STLLoader === 'function' ? STLLoader : null);
+
+                if (!STLLoaderConstructor) {
+                    console.error('❌ STLLoader not found! Falling back to OBJ.');
+                    loadRocketOBJ();
+                    return;
+                }
+
+                const stlLoader = new STLLoaderConstructor();
+
+                stlLoader.load('/api/model-stl', (geometry) => {
+                    geometry.center();
+                    geometry.computeVertexNormals();
+
+                    const material = new THREE.MeshPhongMaterial({
+                        color: 0xff4444,
+                        shininess: 100,
+                        side: THREE.DoubleSide
+                    });
+
+                    // Remove existing procedural fallback if any
+                    if (rocket) scene.remove(rocket);
+
+                    rocket = new THREE.Mesh(geometry, material);
+                    rocket.scale.set(0.1, 0.1, 0.1);
+                    rocket.rotation.x = -Math.PI / 2;
+
+                    rocket.castShadow = true;
+                    rocket.receiveShadow = true;
+
+                    scene.add(rocket);
+                    console.log('✅ STL Rocket model loaded successfully');
+                },
+                    undefined,
+                    (error) => {
+                        console.error('❌ Error loading STL:', error);
+                        loadRocketOBJ();
+                    });
+            }
+
+            // Load OBJ as fallback
+            function loadRocketOBJ() {
+                const MTLLoaderConstructor = (typeof THREE.MTLLoader === 'function') ? THREE.MTLLoader : (typeof MTLLoader === 'function' ? MTLLoader : null);
+                const OBJLoaderConstructor = (typeof THREE.OBJLoader === 'function') ? THREE.OBJLoader : (typeof OBJLoader === 'function' ? OBJLoader : null);
+
+                if (!MTLLoaderConstructor || !OBJLoaderConstructor) {
+                    console.error('❌ OBJ/MTL Loader not found! Using procedural fallback.');
+                    loadProceduralFallback();
+                    return;
+                }
+
+                const mtlLoader = new MTLLoaderConstructor();
+                const objLoader = new OBJLoaderConstructor();
+
+                // Load materials first
+                mtlLoader.load('/api/materials', (materials) => {
+                    materials.preload();
+                    objLoader.setMaterials(materials);
+
+                    // Then load the model
+                    objLoader.load('/api/model', (obj) => {
+                        obj.scale.set(1.5, 1.5, 1.5);
+                        obj.position.set(0, -1, 0);
+                        obj.traverse((child) => {
+                            if (child instanceof THREE.Mesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                            }
+                        });
+
+                        // Remove existing procedural fallback
+                        if (rocket) scene.remove(rocket);
+
+                        rocket = obj;
+                        scene.add(rocket);
+                        console.log('✅ OBJ Rocket model loaded successfully');
+                    },
+                        undefined,
+                        (error) => {
+                            console.error('❌ Error loading OBJ:', error);
+                            loadProceduralFallback();
+                        });
+                },
+                    undefined,
+                    (error) => {
+                        console.error('❌ Error loading MTL:', error);
+                        // Try loading OBJ without materials
+                        objLoader.load('/api/model', (obj) => {
+                            obj.scale.set(1.5, 1.5, 1.5);
+                            obj.position.set(0, -1, 0);
+                            rocket = obj;
+                            scene.add(rocket);
+                            console.log('✅ OBJ model loaded (without materials)');
+                        },
+                            undefined,
+                            (err) => {
+                                console.error('❌ Error loading OBJ fallback:', err);
+                                loadProceduralFallback();
+                            });
+                    });
+            }
+
+            function loadProceduralFallback() {
+                // Don't replace if we already have a real model
+                if (rocket && rocket.type !== 'Group') return;
+
+                console.warn('⚠️ Using procedural rocket fallback.');
+                if (rocket) scene.remove(rocket);
+                rocket = createFallbackRocket();
+                scene.add(rocket);
+            }
+
+            // Fallback procedural rocket if model loading fails
+            function createFallbackRocket() {
+                const rocketGroup = new THREE.Group();
+
+                // Main body (cylinder)
+                const bodyGeometry = new THREE.CylinderGeometry(0.8, 0.8, 5, 32);
+                const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000, shininess: 100 });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.castShadow = true;
+                body.position.z = 0;
+                rocketGroup.add(body);
+
+                // Nose cone (cone)
+                const noseGeometry = new THREE.ConeGeometry(0.8, 2, 32);
+                const noseMaterial = new THREE.MeshPhongMaterial({ color: 0xffd700, shininess: 100 });
+                const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+                nose.position.z = 3.5;
+                nose.castShadow = true;
+                rocketGroup.add(nose);
+
+                // Fins (3 fins)
+                const finGeometry = new THREE.BoxGeometry(0.4, 2, 0.15);
+                const finMaterial = new THREE.MeshPhongMaterial({ color: 0x00d4ff, shininess: 50 });
+
+                for (let i = 0; i < 3; i++) {
+                    const fin = new THREE.Mesh(finGeometry, finMaterial);
+                    fin.position.z = -1.5;
+                    fin.rotation.y = (i * Math.PI * 2) / 3;
+                    fin.position.x = Math.cos((i * Math.PI * 2) / 3) * 1;
+                    fin.position.y = Math.sin((i * Math.PI * 2) / 3) * 1;
+                    fin.castShadow = true;
+                    rocketGroup.add(fin);
+                }
+
+                // Engine bell
+                const engineGeometry = new THREE.ConeGeometry(0.6, 1, 32);
+                const engineMaterial = new THREE.MeshPhongMaterial({ color: 0x666666, shininess: 30 });
+                const engine = new THREE.Mesh(engineGeometry, engineMaterial);
+                engine.position.z = -2.5;
+                engine.rotation.z = Math.PI;
+                engine.castShadow = true;
+                rocketGroup.add(engine);
+
+                // Window/viewport
+                const windowGeometry = new THREE.CircleGeometry(0.3, 32);
+                const windowMaterial = new THREE.MeshPhongMaterial({ color: 0x00ffff, shininess: 100 });
+                const window = new THREE.Mesh(windowGeometry, windowMaterial);
+                window.position.z = 0.81;
+                window.position.y = 0.5;
+                rocketGroup.add(window);
+
+                return rocketGroup;
+            }
+
+            // Animate 3D scene
+            function animate3D() {
+                requestAnimationFrame(animate3D);
+
+                // Update rocket orientation based on accelerometer
+                if (rocket) {
+                    // Smoothly interpolate to target angles
+                    // ax, ay, az data usually represents gravity vector in local frame
+                    // We map these to Euler angles or use lookAt if we want to point at gravity
+
+                    const targetX = Math.atan2(accelY, accelZ);
+                    const targetZ = -Math.atan2(accelX, accelZ);
+
+                    // Simple smoothing
+                    const lerp = 0.1;
+                    rocket.rotation.x += (targetX - rocket.rotation.x) * lerp;
+                    rocket.rotation.z += (targetZ - rocket.rotation.z) * lerp;
+
+                    // Add a slight "breathing" or idle animation if not moving much
+                    if (Math.abs(accelX) < 0.1 && Math.abs(accelY) < 0.1) {
+                        rocket.rotation.y += 0.005;
+                    }
+                }
+
+                renderer.render(scene, camera);
+            }
+
+            // Initialize charts
+            function initCharts() {
+                // Velocity Chart
+                velocityChart = new Chart(document.getElementById('velocityChart'), {
+                    type: 'line',
+                    data: {
+                        labels: timeData,
+                        datasets: [{
+                            label: 'Relative Velocity',
+                            data: velocityData,
+                            borderColor: colors.yellow,
+                            backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0, 212, 255, 0.1)' },
+                                ticks: { color: '#aaa' }
+                            },
+                            x: {
+                                grid: { color: 'rgba(0, 212, 255, 0.1)' },
+                                ticks: { color: '#aaa' }
+                            }
+                        }
+                    }
+                });
+
+                // Altitude Chart
+                altitudeChart = new Chart(document.getElementById('altitudeChart'), {
+                    type: 'line',
+                    data: {
+                        labels: timeData,
+                        datasets: [{
+                            label: 'Altitude',
+                            data: altitudeData,
+                            borderColor: colors.red,
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0, 212, 255, 0.1)' },
+                                ticks: { color: '#aaa' }
+                            },
+                            x: {
+                                grid: { color: 'rgba(0, 212, 255, 0.1)' },
+                                ticks: { color: '#aaa' }
+                            }
+                        }
+                    }
+                });
+
+                // Trajectory Chart (Range vs Azimuth)
+                trajectoryChart = new Chart(document.getElementById('trajectoryChart'), {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: 'Flight Path',
+                            data: rangeData.map((r, i) => ({ x: r, y: azimuthData[i] || 0 })),
+                            borderColor: colors.cyan,
+                            backgroundColor: 'rgba(0, 212, 255, 0.3)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Range (km)', color: '#aaa' },
+                                grid: { color: 'rgba(0, 212, 255, 0.1)' },
+                                ticks: { color: '#aaa' }
+                            },
+                            y: {
+                                title: { display: true, text: 'Azimuth (deg)', color: '#aaa' },
+                                grid: { color: 'rgba(0, 212, 255, 0.1)' },
+                                ticks: { color: '#aaa' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Fetch telemetry data
+            async function fetchTelemetry() {
+                try {
+                    const response = await fetch('/telemetry/all');
+                    const data = await response.json();
+
+                    // Update status
+                    const statusResponse = await fetch('/status');
+                    const srvStatus = await statusResponse.json();
+
+                    document.getElementById('statusIndicator').classList.toggle('connected', srvStatus.connected);
+                    document.getElementById('statusText').textContent = srvStatus.connected ? 'Connected' : 'Disconnected';
+                    document.getElementById('packetCount').textContent = srvStatus.packets_received || 0;
+                    document.getElementById('dataPointCount').textContent = data.length || 0;
+
+                    // Process data
+                    timeData = [];
+                    velocityData = [];
+                    altitudeData = [];
+                    rangeData = [];
+                    azimuthData = [];
+
+                    data.forEach((point, index) => {
+                        // Calculate time in seconds from timestamp
+                        const time = (point.ts || index) / 1000;
+                        timeData.push(time);
+
+                        // Calculate acceleration magnitude (velocity proxy)
+                        const ax = point.ax || 0;
+                        const ay = point.ay || 0;
+                        const az = point.az || 0;
+                        const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
+                        velocityData.push(accelMag);
+
+                        // Altitude
+                        altitudeData.push(point.alt || 0);
+
+                        // Range is index-based progression
+                        rangeData.push((point.alt || 0) * 1.5);
+
+                        // Azimuth from gyro data
+                        const gx = point.gx || 0;
+                        const gy = point.gy || 0;
+                        const azimuth = (Math.atan2(gy, gx) * 180) / Math.PI;
+                        azimuthData.push((azimuth + 360) % 360);
+                    });
+
+                    // Update parameters with latest data
+                    if (data.length > 0) {
+                        const latest = data[data.length - 1];
+                        const ax = latest.ax || 0;
+                        const ay = latest.ay || 0;
+                        const az = latest.az || 0;
+                        const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
+
+                        const gx = latest.gx || 0;
+                        const gy = latest.gy || 0;
+                        const gz = latest.gz || 0;
+                        const gyroMag = Math.sqrt(gx * gx + gy * gy + gz * gz);
+
+                        document.getElementById('paramTime').textContent = ((latest.ts || 0) / 1000).toFixed(2);
+                        document.getElementById('paramAltitude').textContent = (latest.alt || 0).toFixed(2);
+                        document.getElementById('paramAccel').textContent = accelMag.toFixed(3);
+                        document.getElementById('paramGyro').textContent = gyroMag.toFixed(3);
+
+                        // Detailed readings
+                        document.getElementById('ax').textContent = ax.toFixed(6);
+                        document.getElementById('ay').textContent = ay.toFixed(6);
+                        document.getElementById('az').textContent = az.toFixed(6);
+                        document.getElementById('accelMag').textContent = accelMag.toFixed(6);
+
+                        document.getElementById('gx').textContent = gx.toFixed(6);
+                        document.getElementById('gy').textContent = gy.toFixed(6);
+                        document.getElementById('gz').textContent = gz.toFixed(6);
+                        document.getElementById('gyroMag').textContent = gyroMag.toFixed(6);
+
+                        document.getElementById('displayAlt').textContent = (latest.alt || 0).toFixed(2) + ' m';
+                        document.getElementById('displayTs').textContent = ((latest.ts || 0) / 1000).toFixed(2) + ' s';
+                        document.getElementById('displayLaunched').textContent = latest.launched ? 'YES' : 'NO';
+                        document.getElementById('displayEjected').textContent = latest.ejected ? 'YES' : 'NO';
+
+                        // Update 3D rocket orientation with accelerometer data
+                        accelX = ax * 2; // Scale for visible rotation
+                        accelY = ay * 2;
+                        accelZ = az;
+
+                        // Update angle displays (convert to degrees)
+                        document.getElementById('rollAngle').textContent = (accelX * 57.3).toFixed(1) + '°';
+                        document.getElementById('pitchAngle').textContent = (accelY * 57.3).toFixed(1) + '°';
+                        document.getElementById('yawAngle').textContent = (accelZ * 57.3).toFixed(1) + '°';
+                    }
+
+                    // Update charts
+                    if (velocityChart) {
+                        velocityChart.data.labels = timeData;
+                        velocityChart.data.datasets[0].data = velocityData;
+                        velocityChart.update('none');
+
+                        altitudeChart.data.labels = timeData;
+                        altitudeChart.data.datasets[0].data = altitudeData;
+                        altitudeChart.update('none');
+
+                        trajectoryChart.data.datasets[0].data = rangeData.map((r, i) => ({ x: r, y: azimuthData[i] || 0 }));
+                        trajectoryChart.update('none');
+                    }
+                } catch (error) {
+                    console.error('Error fetching telemetry:', error);
+                }
+            }
+
+            // Initialize on load
+            window.addEventListener('load', () => {
+                console.log('Dashboard initializing...');
+
+                try {
+                    initCharts();
+                    console.log('✅ Charts initialized');
+                } catch (e) {
+                    console.error('❌ Failed to initialize charts:', e);
+                }
+
+                try {
+                    init3DRocket();
+                    console.log('✅ 3D System initialized');
+                } catch (e) {
+                    console.error('❌ Failed to initialize 3D system:', e);
+                    // Try to start animation loop anyway if renderer was partially created
+                    if (typeof animate3D === 'function') {
+                        try { animate3D(); } catch (err) { }
+                    }
+                }
+
+                // Start telemetry polling regardless of 3D/Chart success
+                try {
+                    fetchTelemetry();
+                    setInterval(fetchTelemetry, 500);
+                    console.log('Telemetry polling started');
+                } catch (e) {
+                    console.error('❌ Failed to start telemetry polling:', e);
+                }
+
+                const btnTestData = document.getElementById('btnTestData');
+                if (btnTestData) {
+                    btnTestData.addEventListener('click', async () => {
+                        try {
+                            const res = await fetch('/test-data');
+                            const result = await res.json();
+                            console.log('Test data injected:', result);
+                            fetchTelemetry();
+                        } catch (e) {
+                            console.error('Failed to inject test data:', e);
+                            alert('Could not reach server. Make sure app.py is running on http://localhost:5000');
+                        }
+                    });
+                }
+            });
+        </script>
+</body>
+
+</html>
