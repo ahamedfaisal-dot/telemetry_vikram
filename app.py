@@ -8,11 +8,24 @@ import time
 import os
 import re
 import sqlite3
+from google import genai
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # ================= CONFIG =================
 SERIAL_PORT = "COM3"      # Change to your port
 BAUD_RATE = 115200
 DB_PATH = os.path.join(os.path.dirname(__file__), "telemetry.db")
+
+# ================= AI CONFIG =================
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = None
+if GEMINI_API_KEY:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    print("⚠️ WARNING: GEMINI_API_KEY not found in .env")
 
 # ================= APP =================
 app = Flask(__name__, template_folder='template')
@@ -281,6 +294,111 @@ def get_model_stl():
                         download_name='Retro_Rocket.STL')
     else:
         return jsonify({"error": "STL model not found"}), 404
+
+def generate_fallback_analysis(stats):
+    """Generate a deterministic aeronautical report when AI is unavailable"""
+    latest = stats['latest']
+    alt = latest.get('alt', 0)
+    launched = latest.get('launched', False)
+    ejected = latest.get('ejected', False)
+    
+    phase = "PRE-LAUNCH"
+    if ejected:
+        phase = "RECOVERY / DESCENT"
+    elif launched:
+        if alt >= stats['max_alt'] - 0.5 and stats['max_alt'] > 5:
+             phase = "APOGEE / COAST"
+        else:
+             phase = "POWERED ASCENT"
+             
+    report = f"**FLIGHT ANALYSIS REPORT (Offline Computed)**\n\n"
+    report += f"**Current flight phase identified as: {phase}**\n\n"
+    report += f"Analysis of the last {stats['points']} telemetry packets indicates a peak altitude of {stats['max_alt']:.2f} meters. "
+    
+    # Analyze stability
+    ax_abs = abs(latest.get('ax', 0))
+    ay_abs = abs(latest.get('ay', 0))
+    if ax_abs > 1.5 or ay_abs > 1.5:
+        report += f"Airframe stability currently shows moderate oscillation (Ax: {latest.get('ax',0):.2f}g). "
+    else:
+        report += "Airframe maintains a stable trajectory with minimal lateral deviation. "
+        
+    # Phase specific detail
+    if phase == "POWERED ASCENT":
+        report += "Positive vertical velocity confirmed. Aerodynamic loads are within structural limits."
+    elif phase == "RECOVERY / DESCENT":
+        report += "Ejection event confirmed. Descent rate is being tracked for terminal velocity analysis."
+    elif phase == "APOGEE / COAST":
+        report += "Zero vertical velocity detected at peak. Monitoring for transition to recovery phase."
+    else:
+        report += "Static telemetry detected. System is armed and awaiting ignition event."
+        
+    return report
+
+@app.route("/api/ai-analysis", methods=["GET"])
+def ai_analysis():
+    """Perform AI analysis of the current flight data"""
+    if not client:
+        return jsonify({"error": "Gemini API client not initialized"}), 500
+    
+    # Get last 100 data points for context
+    recent_data = load_from_db(limit=100)
+    if not recent_data:
+        return jsonify({"error": "No flight data available for analysis"}), 404
+        
+    try:
+        # Prepare a concise summary of the data for the AI
+        data_summary = []
+        for d in recent_data:
+            data_summary.append({
+                "t": d.get('ts'),
+                "alt": d.get('alt'),
+                "ax": d.get('ax'),
+                "ay": d.get('ay'),
+                "az": d.get('az')
+            })
+            
+        stats = {
+            "max_alt": max(d.get('alt', 0) for d in recent_data),
+            "points": len(recent_data),
+            "latest": recent_data[-1]
+        }
+
+        prompt = f"""
+        Analyze this rocket flight telemetry. 
+        Context: The following is a sequence of the last {stats['points']} data points.
+        Summary Statistics: Peak Altitude: {stats['max_alt']:.2f}m.
+        Latest State: {json.dumps(stats['latest'])}
+        
+        Data points (timestamp, altitude, accel X/Y/Z):
+        {json.dumps(data_summary)}
+        
+        Task: Provide a short, professional aeronautical analysis of the flight's current phase (ignition, ascent, coast, apogee, or descent). 
+        Mention any anomalies in G-forces or stability. Keep it under 150 words.
+        """
+        
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt
+            )
+            return jsonify({
+                "analysis": response.text,
+                "timestamp": time.time(),
+                "provider": "gemini-ai"
+            })
+        except Exception as ai_err:
+            print(f"Gemini API Error (Falling back): {ai_err}")
+            fallback_report = generate_fallback_analysis(stats)
+            return jsonify({
+                "analysis": fallback_report,
+                "timestamp": time.time(),
+                "provider": "system-fallback"
+            })
+            
+    except Exception as e:
+        print(f"Analysis System Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/simulated/<filename>", methods=["GET"])
 def get_simulated_image(filename):

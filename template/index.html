@@ -310,6 +310,20 @@
             </div>
         </div>
 
+        <!-- AI Flight Analysis Section -->
+        <div class="alt-chart-container full-width" style="margin-top: 20px;">
+            <div class="chart-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>AI FLIGHT ANALYSIS</span>
+                <button id="btnAiAnalyze"
+                    style="background: rgba(0, 212, 255, 0.2); border: 1px solid #00d4ff; color: #00d4ff; cursor: pointer; padding: 5px 15px; border-radius: 4px; font-size: 0.8em; transition: all 0.3s;">GENERATE
+                    LIVE REPORT</button>
+            </div>
+            <div id="aiAnalysisResult"
+                style="margin-top: 15px; min-height: 100px; background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 5px; border-left: 4px solid #ffd700; line-height: 1.6; color: #ddd; font-style: italic;">
+                Wait for telemetry data and click 'Generate Live Report' for aeronautical insights...
+            </div>
+        </div>
+
         <!-- Additional Charts -->
         <div class="alt-chart-container full-width">
             <div class="chart-title">TRAJECTORY</div>
@@ -451,6 +465,36 @@
                 } catch (error) {
                     console.error('Error loading simulated outputs:', error);
                     container.innerHTML = '<div style="color: #ff6b6b; padding: 20px;">Error scanning for outputs.</div>';
+                }
+            }
+
+            async function runAiAnalysis() {
+                const btn = document.getElementById('btnAiAnalyze');
+                const resultDiv = document.getElementById('aiAnalysisResult');
+
+                btn.disabled = true;
+                btn.textContent = 'ANALYZING...';
+                btn.style.opacity = '0.5';
+                resultDiv.style.opacity = '0.5';
+                resultDiv.innerHTML = 'Connecting to Gemini flight intelligence...';
+
+                try {
+                    const response = await fetch('/api/ai-analysis');
+                    const data = await response.json();
+
+                    if (data.analysis) {
+                        resultDiv.innerHTML = data.analysis.replace(/\n/g, '<br>');
+                    } else if (data.error) {
+                        resultDiv.innerHTML = `<span style="color: #ff6b6b">Analysis failed: ${data.error}</span>`;
+                    }
+                } catch (error) {
+                    console.error('AI Analysis API error:', error);
+                    resultDiv.innerHTML = '<span style="color: #ff6b6b">Error communicating with AI analysis engine. Check if app.py is running.</span>';
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'GENERATE LIVE REPORT';
+                    btn.style.opacity = '1';
+                    resultDiv.style.opacity = '1';
                 }
             }
 
@@ -960,6 +1004,11 @@
                     console.log('✅ Simulated outputs loaded');
                 } catch (e) {
                     console.error('❌ Failed to load simulated outputs:', e);
+                }
+
+                const btnAiAnalyze = document.getElementById('btnAiAnalyze');
+                if (btnAiAnalyze) {
+                    btnAiAnalyze.addEventListener('click', runAiAnalysis);
                 }
 
                 const btnTestData = document.getElementById('btnTestData');
