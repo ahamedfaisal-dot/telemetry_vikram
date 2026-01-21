@@ -98,7 +98,7 @@ The ground station should output JSON in this format:
 4. **Install dependencies**
 
    ```bash
-   pip install flask flask-cors pyserial
+   pip install -r requirements.txt
    ```
 
 ---
